@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,6 @@ import { MaterialIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebaseConfig';
-import { analyzeSoilImage } from '../services/openaiService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -48,17 +47,14 @@ const HomeScreen = ({ navigation }) => {
       onPanResponderRelease: (evt, gestureState) => {
         pan.flattenOffset();
         
-        // Keep button within screen bounds
-        let newX = gestureState.moveX - 30; // 30 is half button width
-        let newY = gestureState.moveY - 30; // 30 is half button height
+        let newX = gestureState.moveX - 30;
+        let newY = gestureState.moveY - 30;
         
-        // Boundary checks
         if (newX < 10) newX = 10;
         if (newX > width - 70) newX = width - 70;
         if (newY < 50) newY = 50;
         if (newY > height - 100) newY = height - 100;
         
-        // Animate to final position
         Animated.spring(pan, {
           toValue: { x: newX - buttonPosition.x, y: newY - buttonPosition.y },
           useNativeDriver: false,
@@ -128,10 +124,55 @@ const HomeScreen = ({ navigation }) => {
 
     setLoading(true);
     try {
-      const result = await analyzeSoilImage(selectedImage.base64);
-      setAnalysis(result);
+      // OpenAI API çağrısı
+      const OPENAI_API_KEY = 'YOUR_API_KEY_HERE'; // API açarını dəyişin
+      
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4-vision-preview',
+          messages: [
+            {
+              role: 'system',
+              content: 'Sen peşəkar kənd təsərrüfatı agronomi. Şəkillərdən torpaq tipini, bitkiləri və problemləri tanı.',
+            },
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: 'Bu torpaq şəklini analiz et. Torpaq tipi, pH, rütubət və gübrə tövsiyəsi ver (Azərbaycanca).',
+                },
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: `data:image/jpeg;base64,${selectedImage.base64}`,
+                  },
+                },
+              ],
+            },
+          ],
+          max_tokens: 800,
+          temperature: 0.7,
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.choices && data.choices[0] && data.choices[0].message) {
+        const result = data.choices[0].message.content;
+        setAnalysis(result);
+        console.log('🖼️ TORPAq ŞƏKIL ANALİZİ:', result);
+      } else {
+        throw new Error('API cavabı yanlış format');
+      }
     } catch (error) {
-      Alert.alert('Analiz Xətası', error.message);
+      console.error('Analiz xətası:', error);
+      Alert.alert('Analiz Xətası', error.message || 'Şəkil analiz edilə bilmədi');
     } finally {
       setLoading(false);
     }
@@ -158,7 +199,6 @@ const HomeScreen = ({ navigation }) => {
       </LinearGradient>
       
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-
         <View style={styles.content}>
           <View style={styles.welcomeCard}>
             <View style={styles.welcomeTitleContainer}>
@@ -199,6 +239,27 @@ const HomeScreen = ({ navigation }) => {
             
             <TouchableOpacity
               style={styles.serviceCardFull}
+              onPress={() => navigation.navigate('Calendar')}
+            >
+              <LinearGradient
+                colors={['#FF9800', '#F57C00', '#E65100']}
+                style={styles.serviceCardFullGradient}
+              >
+                <View style={styles.serviceIconContainer}>
+                  <MaterialIcons name="calendar-month" size={32} color="white" />
+                </View>
+                <View style={styles.serviceTextContainer}>
+                  <Text style={styles.serviceTitle}>Taqvim Planlama</Text>
+                  <Text style={styles.serviceDescription}>Əkim-yığım və gübrələmə planlaması</Text>
+                </View>
+                <View style={styles.serviceArrow}>
+                  <MaterialIcons name="arrow-forward" size={20} color="white" />
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.serviceCardFull}
               onPress={() => navigation.navigate('Plants')}
             >
               <LinearGradient
@@ -210,7 +271,7 @@ const HomeScreen = ({ navigation }) => {
                 </View>
                 <View style={styles.serviceTextContainer}>
                   <Text style={styles.serviceTitle}>Bitki Bələdçisi</Text>
-                  <Text style={styles.serviceDescription}>12+ bitki növü haqqında ətraflı baxım məlumatları</Text>
+                  <Text style={styles.serviceDescription}>12+ bitki növü haqqında ətraflı baxım</Text>
                 </View>
                 <View style={styles.serviceArrow}>
                   <MaterialIcons name="arrow-forward" size={20} color="white" />
@@ -239,7 +300,6 @@ const HomeScreen = ({ navigation }) => {
               </LinearGradient>
             </TouchableOpacity>
           </View>
-
 
           {selectedImage && (
             <View style={styles.imagePreviewCard}>
@@ -293,31 +353,31 @@ const HomeScreen = ({ navigation }) => {
             </View>
           ) : null}
         </View>
-        </ScrollView>
+      </ScrollView>
 
-        {/* Draggable AI Assistant Floating Button */}
-        <Animated.View
-          style={[
-            styles.floatingAIButton,
-            {
-              transform: [{ translateX: pan.x }, { translateY: pan.y }],
-            },
-          ]}
-          {...panResponder.panHandlers}
+      {/* Draggable AI Assistant Floating Button */}
+      <Animated.View
+        style={[
+          styles.floatingAIButton,
+          {
+            transform: [{ translateX: pan.x }, { translateY: pan.y }],
+          },
+        ]}
+        {...panResponder.panHandlers}
+      >
+        <TouchableOpacity
+          onPress={() => navigation.navigate('AIAssistant')}
+          style={styles.floatingButtonTouchable}
         >
-          <TouchableOpacity
-            onPress={() => navigation.navigate('AIAssistant')}
-            style={styles.floatingButtonTouchable}
+          <LinearGradient
+            colors={['#FF9800', '#F57C00', '#E65100']}
+            style={styles.floatingButtonGradient}
           >
-            <LinearGradient
-              colors={['#FF9800', '#F57C00', '#E65100']}
-              style={styles.floatingButtonGradient}
-            >
-              <MaterialIcons name="psychology" size={28} color="white" />
-            </LinearGradient>
-          </TouchableOpacity>
-        </Animated.View>
-      </SafeAreaView>
+            <MaterialIcons name="psychology" size={28} color="white" />
+          </LinearGradient>
+        </TouchableOpacity>
+      </Animated.View>
+    </SafeAreaView>
   );
 };
 
@@ -365,11 +425,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  logoutText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
   scrollView: {
     flex: 1,
   },
@@ -411,6 +466,40 @@ const styles = StyleSheet.create({
   },
   servicesSection: {
     marginTop: 15,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 15,
+  },
+  modernButton: {
+    flex: 1,
+    borderRadius: 15,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  buttonGradient: {
+    paddingVertical: 20,
+    paddingHorizontal: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
   },
   serviceCardFull: {
     marginTop: 15,
@@ -455,89 +544,6 @@ const styles = StyleSheet.create({
   serviceArrow: {
     alignSelf: 'flex-end',
     padding: 4,
-  },
-  aiAssistantSection: {
-    marginTop: 25,
-    marginBottom: 20,
-  },
-  aiAssistantButton: {
-    borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 10,
-  },
-  aiAssistantGradient: {
-    padding: 20,
-  },
-  aiAssistantContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  aiIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 15,
-  },
-  aiTextContainer: {
-    flex: 1,
-  },
-  aiTitle: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  aiSubtitle: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 14,
-  },
-  aiArrow: {
-    padding: 8,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2E7D32',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 15,
-  },
-  modernButton: {
-    flex: 1,
-    borderRadius: 15,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 6,
-  },
-  buttonGradient: {
-    paddingVertical: 20,
-    paddingHorizontal: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonIcon: {
-    fontSize: 24,
-    marginBottom: 8,
-  },
-  buttonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
   },
   imagePreviewCard: {
     backgroundColor: 'white',

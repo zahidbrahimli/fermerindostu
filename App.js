@@ -13,7 +13,7 @@ import PlantsScreen from './screens/PlantsScreen';
 import AboutScreen from './screens/AboutScreen';
 import AIAssistantScreen from './screens/AIAssistantScreen';
 import LoadingScreen from './components/LoadingScreen';
-
+import CalendarScreen from './screens/CalendarScreen';
 const Stack = createStackNavigator();
 
 export default function App() {
@@ -43,6 +43,11 @@ export default function App() {
             <Stack.Screen 
               name="Home" 
               component={HomeScreen} 
+              options={{ headerShown: false }} 
+            />
+                  <Stack.Screen 
+              name="Calendar" 
+              component={CalendarScreen} 
               options={{ headerShown: false }} 
             />
             <Stack.Screen 
