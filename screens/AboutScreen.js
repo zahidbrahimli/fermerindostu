@@ -124,7 +124,7 @@ const AboutScreen = ({ navigation }) => {
               
               <View style={styles.techItem}>
                 <MaterialIcons name="psychology" size={30} color="#FF9800" />
-                <Text style={styles.techName}>OpenAI GPT-4</Text>
+                <Text style={styles.techName}>Our own AI Model</Text>
               </View>
               
               <View style={styles.techItem}>
